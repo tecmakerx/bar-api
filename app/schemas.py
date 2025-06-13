@@ -99,6 +99,7 @@ class PedidoResponse(BaseModel):
 
 
 
+
 # -------- CLIENTE WELCOME --------
 
 class ClienteProdutosResponse(BaseModel):

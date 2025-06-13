@@ -18,6 +18,7 @@ class Mesa(Base):
     clientes = relationship("Cliente", back_populates="mesa", cascade="all, delete")
 
 
+
 class Cliente(Base):
     __tablename__ = "clientes"
 

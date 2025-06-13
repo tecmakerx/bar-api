@@ -11,6 +11,7 @@ import base64
 
 
 
+
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(

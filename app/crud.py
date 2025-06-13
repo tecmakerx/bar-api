@@ -11,6 +11,7 @@ from io import BytesIO
 
 
 
+
 # -------- MESAS --------
 
 def generate_qrcode_base64(identificador: str) -> str:
