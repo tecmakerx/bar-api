@@ -1,4 +1,5 @@
 from io import BytesIO
+from fastapi import HTTPException
 import qrcode
 from sqlalchemy.orm import Session
 from . import models, schemas
@@ -119,12 +120,22 @@ def get_produtos(db: Session) -> list[models.Produto]:
 def get_produto(db: Session, produto_id: int) -> models.Produto | None:
     return db.query(models.Produto).filter(models.Produto.id == produto_id).first()
 
-def create_produto(db: Session, produto: schemas.ProdutoCreate) -> models.Produto:
-    novo_produto = models.Produto(nome=produto.nome, preco=produto.preco)
-    db.add(novo_produto)
+def create_produtos(db: Session, produtos: list[schemas.ProdutoCreate]) -> list[models.Produto]:
+    produtos_criados = []
+    for produto in produtos:
+        novo_produto = models.Produto(
+            nome=produto.nome,
+            preco=produto.preco
+        )
+        db.add(novo_produto)
+        produtos_criados.append(novo_produto)
+
     db.commit()
-    db.refresh(novo_produto)
-    return novo_produto
+
+    for produto in produtos_criados:
+        db.refresh(produto)
+
+    return produtos_criados
 
 
 
@@ -140,13 +151,16 @@ def create_pedido(db: Session, pedido: schemas.PedidoCreate) -> models.Pedido:
         created_at=datetime.utcnow()
     )
     db.add(db_pedido)
-    db.commit()
-    db.refresh(db_pedido)
+    db.flush()  # Garante que o ID do pedido é gerado antes de criar os itens
 
+    itens = []
     for item in pedido.itens:
         produto = get_produto(db, item.produto_id)
         if not produto:
-            continue
+            raise HTTPException(
+                status_code=404,
+                detail=f"Produto com ID {item.produto_id} não encontrado"
+            )
 
         pedido_item = models.PedidoItem(
             pedido_id=db_pedido.id,
@@ -154,14 +168,45 @@ def create_pedido(db: Session, pedido: schemas.PedidoCreate) -> models.Pedido:
             quantidade=item.quantidade,
             valor_unitario=produto.preco
         )
-        db.add(pedido_item)
+        itens.append(pedido_item)
 
+    db.add_all(itens)  # ⚠️ Isso garante que todos os itens sejam salvos corretamente
     db.commit()
     db.refresh(db_pedido)
     return db_pedido
 
-def get_pedidos(db: Session) -> list[models.Pedido]:
-    return db.query(models.Pedido).all()
+
+
+def get_pedidos(db: Session):
+    pedidos = db.query(models.Pedido).all()
+
+    response = []
+    for pedido in pedidos:
+        response.append({
+            "id": pedido.id,
+            "cliente_id": pedido.cliente_id,
+            '''"cliente_nome": pedido.cliente.nome,  # Se você fez o relacionamento correto'''
+            "status": pedido.status,
+            "forma_pagamento": pedido.forma_pagamento,
+            "itens": [
+                {
+                    "produto": {
+                        "id": item.produto.id,
+                        "nome": item.produto.nome,
+                        "preco": item.valor_unitario
+                    },
+                    "quantidade": item.quantidade,
+                    "valor_unitario": item.valor_unitario
+                }
+                for item in pedido.itens
+            ]
+        })
+
+    return response
+
+
+
+
 
 def update_pedido_status(db: Session, pedido_id: int, status: str) -> models.Pedido | None:
     pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
@@ -173,3 +218,28 @@ def update_pedido_status(db: Session, pedido_id: int, status: str) -> models.Ped
     db.refresh(pedido)
     return pedido
 
+
+
+def listar_clientes_mesas_valor_total(db: Session) -> list[dict]:
+    clientes = db.query(models.Cliente).all()
+
+    response = []
+    for cliente in clientes:
+        pedidos = (
+            db.query(models.Pedido)
+            .filter(models.Pedido.cliente_id == cliente.id)
+            .all()
+        )
+
+        total = 0
+        for pedido in pedidos:
+            for item in pedido.itens:
+                total += float(item.valor_unitario) * item.quantidade
+
+        response.append({
+            "cliente_id": cliente.id,
+            "mesa_id": cliente.mesa_id,
+            "valor_total_pedidos": total
+        })
+
+    return response

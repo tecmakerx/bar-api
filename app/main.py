@@ -41,9 +41,9 @@ def get_db():
 
 # ---------------------- PRODUTOS ----------------------
 
-@app.post("/produtos/", response_model=schemas.ProdutoBase, status_code=status.HTTP_201_CREATED)
-def criar_produto(produto: schemas.ProdutoCreate, db: Session = Depends(get_db)):
-    return crud.create_produto(db, produto)
+@app.post("/produtos/", response_model=List[schemas.ProdutoBase], status_code=status.HTTP_201_CREATED)
+def criar_produtos(produtos: List[schemas.ProdutoCreate], db: Session = Depends(get_db)):
+    return crud.create_produtos(db, produtos)
 
 @app.get("/produtos/", response_model=List[schemas.ProdutoBase])
 def listar_produtos(db: Session = Depends(get_db)):
@@ -207,7 +207,35 @@ def criar_pedido(pedido: schemas.PedidoCreate, db: Session = Depends(get_db)):
 
 @app.get("/pedidos/", response_model=List[schemas.PedidoResponse])
 def listar_pedidos(db: Session = Depends(get_db)):
-    return crud.get_pedidos(db)
+    pedidos = db.query(models.Pedido).all()
 
+    resposta = []
+    for pedido in pedidos:
+        resposta.append({
+            "id": pedido.id,
+            "cliente_id": pedido.cliente_id,
+            "mesa_identificador": pedido.cliente.mesa.identificador,  # <-- Aqui puxa o identificador da mesa
+            "status": pedido.status,
+            "forma_pagamento": pedido.forma_pagamento,
+            "itens": [
+                {
+                    "produto": {
+                        "id": item.produto.id,
+                        "nome": item.produto.nome,
+                        "preco": item.produto.preco
+                    },
+                    "quantidade": item.quantidade,
+                    "valor_unitario": item.valor_unitario
+                } for item in pedido.itens
+            ]
+        })
+
+    return resposta
+
+
+
+@app.get("/clientes-mesas-valor-total/", response_model=List[schemas.ClienteMesaValorTotalResponse])
+def listar_clientes_mesas_valor_total(db: Session = Depends(get_db)):
+    return crud.listar_clientes_mesas_valor_total(db)
 
 

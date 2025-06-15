@@ -72,6 +72,16 @@ class PedidoCreate(BaseModel):
     itens: List[PedidoItemCreate]
 
 
+class ClienteMesaValorTotalResponse(BaseModel):
+    cliente_id: int
+    mesa_id: str
+    valor_total_pedidos: float
+
+    class Config:
+        from_attributes = True
+
+
+
 
 
 
@@ -89,6 +99,7 @@ class PedidoItemResponse(BaseModel):
 class PedidoResponse(BaseModel):
     id: int
     cliente_id: int
+    mesa_identificador: str  # <-- Aqui é o identificador real, ex: "M-5"
     status: str
     forma_pagamento: str
     itens: List[PedidoItemResponse]
